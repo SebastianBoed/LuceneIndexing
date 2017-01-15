@@ -26,24 +26,38 @@ public class Main {
 	static HashMap<String, String> LABELS = new HashMap<>();
 	
 	private static CustomQueryParser parser;
+	private static CustomQueryParser parser_new;
 	private static IndexReader reader;
 	private static IndexSearcher searcher;
 
 	public static void main(String[] args) throws IOException, ParseException {
-		//index();
-				
-		parser = new CustomQueryParser("content", "date", new StandardAnalyzer());
+		//index();	
+		
+		parser = new CustomQueryParser("content", "date", new StandardAnalyzer(), 0);
+		parser_new = new CustomQueryParser("content", "date", new StandardAnalyzer(), 5);
 		reader = DirectoryReader.open(FSDirectory.open((Paths.get(INDEX_PATH))));
 		searcher = new IndexSearcher(reader);
 
-		//search("donald trump@2011-2013");
+		//String query = "cause of stress";
+		//search(query);
+		//search_new(query);
 		
 		importLabels();
-		write(new PrintWriter("query_scores_features_a.txt"), "a");
-		write(new PrintWriter("query_scores_features_f.txt"), "f");
-		write(new PrintWriter("query_scores_features_p.txt"), "p");
-		write(new PrintWriter("query_scores_features_r.txt"), "r");
-		
+//		write(new PrintWriter("query_scores_features_a.txt"), "a");
+//		write(new PrintWriter("query_scores_features_f.txt"), "f");
+//		write(new PrintWriter("query_scores_features_p.txt"), "p");
+//		write(new PrintWriter("query_scores_features_r.txt"), "r");
+//		
+
+		ArrayList<Topic> topics = TopicParser.readTopics(TOPIC_PATH);
+		for(int j = 0; j<topics.size() && j<300; j++) {
+			Topic t = topics.get(j);
+			try {
+				System.out.println(showTopDocsWithLabel(search(t.title), t) + " \t " +  showTopDocsWithLabel(search_new(t.title), t) + "\t" + t.title + "\t" + CustomQueryParser.words);
+			} catch (Exception e) {
+				
+			}
+		}
 
 
 	}
@@ -55,18 +69,41 @@ public class Main {
 
 	public static TopDocs search(String queryString) throws IOException, ParseException {
 		TopDocs hits = searcher.search(parser.parse(queryString), 1000000);
-
-		System.out.println(hits.totalHits + " Hits for: " + queryString);
-		//showTopDocs(hits);
-
+		return hits;
+	}
+	
+	public static TopDocs search_new(String queryString) throws IOException, ParseException {
+		TopDocs hits = searcher.search(parser_new.parse(queryString), 1000000);
 		return hits;
 	}
 	
 	public static void showTopDocs(TopDocs hits) throws IOException {
-		for (int i = 0; i < 5 && i < hits.totalHits; i++) {
+		for (int i = 0; i < 15 && i < hits.totalHits; i++) {
 			Document doc = reader.document(hits.scoreDocs[i].doc);
-			System.out.println(doc.getField("id").stringValue());
+			System.out.println(hits.scoreDocs[i].score + "\t" + doc.getField("id").stringValue());
 		}
+	}
+	
+	public static double showTopDocsWithLabel(TopDocs hits, Topic t) throws IOException {
+		String[] afpr = {"a","f","p","r"};
+		int k = 5;
+		double metric = 0;
+		for (int i = 0; i < k && i < hits.totalHits; i++) {
+			Document doc = reader.document(hits.scoreDocs[i].doc);
+			String docName =  doc.getField("id").stringValue();
+			int maxLabel = 0;
+			for(String str : afpr) {
+				String queryId = t.id + str;
+				String label = LABELS.get(queryId +"-"+ docName);
+				if(label != null) {
+					int labelInt = Integer.parseInt(label);
+					if(labelInt>maxLabel) maxLabel = labelInt;
+				}
+			}
+			//System.out.println(maxLabel + "\t qid:" + t.id + "\t 1:" + hits.scoreDocs[i].score);
+			metric += (double) ((double) maxLabel)/((double) (i+1));
+		}
+		return metric;
 	}
 		
 	public static void importLabels() throws IOException {
@@ -99,15 +136,9 @@ public class Main {
 						String output = label + " qid:" + t.id + " 1:" + hits.scoreDocs[i].score + " 2:" + (t.query_issue_time - Long.parseLong(doc.getField("date").stringValue())) + " # " + queryId;
 						out.println(output);
 					}
-				
-				
-				
 			}	
 		}
 		out.flush();
 		out.close();
 	}
-	
-	
-
 }

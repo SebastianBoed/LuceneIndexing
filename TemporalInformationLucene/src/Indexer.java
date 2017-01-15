@@ -152,7 +152,6 @@ public class Indexer {
 		  Document doc = new Document();
 		  doc.add(new StringField("title", title, Field.Store.YES));
 		  doc.add(new StringField("id", id, Field.Store.YES));
-		  
 		  doc.add(new TextField("body", body, Field.Store.YES));
 		  doc.add(new TextField("content", title + " " + body, Field.Store.YES));
 		  doc.add(new StoredField("date", date));
